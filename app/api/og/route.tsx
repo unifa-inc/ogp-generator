@@ -1,15 +1,19 @@
 import { ImageResponse } from "next/og";
 
+// next/og (Satori) は TTF/OTF のみ対応。CDN から TTF を取得し、
+// 自サイトへの fetch を避けて Vercel デプロイ保護の 401 を防ぐ
 export const runtime = "edge";
 
 const OGP_WIDTH = 1200;
 const OGP_HEIGHT = 630;
 
-async function loadMplus1pFont(baseUrl: string): Promise<ArrayBuffer> {
-  // M PLUS 1p Medium (500) - WOFF format (next/og does not support WOFF2)
-  const fontUrl = `${baseUrl}/fonts/m-plus-1p-japanese-500-normal.woff`;
-  const res = await fetch(fontUrl);
-  if (!res.ok) throw new Error("Failed to load font");
+/** Fontsource CDN: M PLUS 1p Japanese 500 (Medium) TTF */
+const MPLUS1P_FONT_URL =
+  "https://cdn.jsdelivr.net/fontsource/fonts/m-plus-1p@5.2.9/japanese-500-normal.ttf";
+
+async function loadMplus1pFont(): Promise<ArrayBuffer> {
+  const res = await fetch(MPLUS1P_FONT_URL);
+  if (!res.ok) throw new Error(`Failed to load font: ${res.status}`);
   return res.arrayBuffer();
 }
 
@@ -24,7 +28,7 @@ export async function GET(request: Request) {
       ? `https://${process.env.VERCEL_URL}`
       : new URL(request.url).origin;
 
-  const fontData = await loadMplus1pFont(baseUrl);
+  const fontData = await loadMplus1pFont();
   const backgroundImageUrl = `${baseUrl}/ogp-background.png`;
 
   return new ImageResponse(
