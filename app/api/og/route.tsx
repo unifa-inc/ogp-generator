@@ -17,19 +17,40 @@ async function loadMplus1pFont(): Promise<ArrayBuffer> {
   return res.arrayBuffer();
 }
 
+/** ArrayBuffer を base64 に変換（Edge でも動作） */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return typeof btoa !== "undefined" ? btoa(binary) : Buffer.from(buffer).toString("base64");
+}
+
+/** 背景画像を data URL で取得（自サイト URL だと Vercel で type: unknown になるため） */
+async function loadBackgroundDataUrl(request: Request): Promise<string> {
+  const origin = new URL(request.url).origin;
+  const imageUrl = `${origin}/ogp-background.png`;
+  const res = await fetch(imageUrl);
+  if (!res.ok) {
+    throw new Error(`Failed to load background image: ${res.status} ${imageUrl}`);
+  }
+  const buffer = await res.arrayBuffer();
+  const contentType = res.headers.get("content-type") ?? "image/png";
+  const base64 = arrayBufferToBase64(buffer);
+  return `data:${contentType};base64,${base64}`;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const line1 = searchParams.get("line1") ?? "";
   const line2 = searchParams.get("line2") ?? "";
   const line3 = searchParams.get("line3") ?? "";
 
-  const baseUrl =
-    process.env.VERCEL_URL != null
-      ? `https://${process.env.VERCEL_URL}`
-      : new URL(request.url).origin;
-
-  const fontData = await loadMplus1pFont();
-  const backgroundImageUrl = `${baseUrl}/ogp-background.png`;
+  const [fontData, backgroundDataUrl] = await Promise.all([
+    loadMplus1pFont(),
+    loadBackgroundDataUrl(request)
+  ]);
 
   return new ImageResponse(
     (
@@ -46,9 +67,9 @@ export async function GET(request: Request) {
           backgroundColor: "#f5f0eb"
         }}
       >
-        {/* Background image */}
+        {/* Background image（data URL にしないと Vercel で Unsupported image type: unknown になる） */}
         <img
-          src={backgroundImageUrl}
+          src={backgroundDataUrl}
           alt=""
           style={{
             position: "absolute",
